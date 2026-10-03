@@ -1,0 +1,6 @@
+{
+  "name": "GEE AI",
+  "description": "GEE AI is a professional long-form and short-form video generation platform powered by artificial intelligence. Create YouTube videos from text prompts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
