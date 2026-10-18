@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with credits, subscription tier and stats",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "creditsRemaining": { "type": "number" },
+        "storageUsedMb": { "type": "number" },
+        "subscriptionTier": { "type": "string" },
+        "videosGeneratedCount": { "type": "number" }
+      },
+      "required": ["email", "name", "role", "creditsRemaining", "subscriptionTier"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Video project created by user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "topic": { "type": "string" },
+        "prompt": { "type": "string" },
+        "targetAudience": { "type": "string" },
+        "lengthType": { "type": "string" },
+        "language": { "type": "string" },
+        "tone": { "type": "string" },
+        "style": { "type": "string" },
+        "presenter": { "type": "string" },
+        "voice": { "type": "string" },
+        "accent": { "type": "string" },
+        "backgroundMusic": { "type": "string" },
+        "videoFormat": { "type": "string" },
+        "resolution": { "type": "string" },
+        "script": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "name", "createdAt", "status"]
+    },
+    "Scene": {
+      "title": "Scene",
+      "description": "Scene belonging to a video project",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "sceneIndex": { "type": "number" },
+        "narration": { "type": "string" },
+        "visualPrompt": { "type": "string" },
+        "durationSeconds": { "type": "number" },
+        "transition": { "type": "string" },
+        "cameraDirection": { "type": "string" },
+        "captionText": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "projectId", "sceneIndex", "status"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Payment or subscription invoice",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "dateString": { "type": "string" },
+        "amount": { "type": "string" },
+        "creditsAdded": { "type": "number" },
+        "planName": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "email", "amount", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document keyed by user auth UID"
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Video projects owned by the user"
+    },
+    "/users/{userId}/projects/{projectId}/scenes/{sceneId}": {
+      "schema": "Scene",
+      "description": "Scenes for a specific video project"
+    },
+    "/users/{userId}/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Billing and invoice receipts for the user"
+    }
+  }
+}

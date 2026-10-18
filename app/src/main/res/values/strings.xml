@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">GEE AI</string>
+    <string name="com.google.firebase.crashlytics.mapping_file_id" translatable="false">none</string>
 </resources>

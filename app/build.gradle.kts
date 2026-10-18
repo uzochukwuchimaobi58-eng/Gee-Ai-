@@ -18,7 +18,7 @@ android {
     minSdk = 24
     targetSdk = 36
     versionCode = 2
-    versionName = "1.1"
+    versionName = "1.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -30,7 +30,7 @@ android {
       if (releaseStoreFile.exists()) {
         storeFile = releaseStoreFile
         storePassword = System.getenv("STORE_PASSWORD")
-        keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
+        keyAlias = System.getenv("KEY_ALIAS") ?: "sonance"
         keyPassword = System.getenv("KEY_PASSWORD")
       } else {
         storeFile = file("${rootDir}/debug.keystore")
@@ -59,8 +59,8 @@ android {
     }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
   }
   buildFeatures {
     compose = true
@@ -115,6 +115,16 @@ dependencies {
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
   implementation(libs.firebase.appcheck.recaptcha)
+  implementation(libs.firebase.firestore)
+  implementation(libs.firebase.auth)
+  implementation(libs.firebase.storage)
+  implementation(libs.firebase.crashlytics)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services.auth)
+  implementation(libs.googleid)
+  implementation(libs.billing)
+  implementation(libs.billing.ktx)
+  implementation(libs.play.services.ads)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)

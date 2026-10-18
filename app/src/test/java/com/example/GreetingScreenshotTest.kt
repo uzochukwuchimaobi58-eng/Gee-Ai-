@@ -1,5 +1,6 @@
 package com.example
 
+import androidx.compose.material3.Text
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.example.ui.theme.MyApplicationTheme
@@ -21,8 +22,36 @@ class GreetingScreenshotTest {
 
   @Test
   fun greeting_screenshot() {
-    composeTestRule.setContent { MyApplicationTheme { Greeting("Robolectric") } }
+    composeTestRule.setContent { MyApplicationTheme { Text("GEE AI") } }
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
+  }
+
+  @Test
+  fun testGeeAiAppRender() {
+    composeTestRule.setContent {
+      MyApplicationTheme {
+        com.example.ui.GeeAiApp()
+      }
+    }
+  }
+
+  @Test
+  fun testAllScreensRender() {
+    val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+    val viewModel = com.example.data.AppViewModel(app)
+    
+    composeTestRule.setContent {
+      MyApplicationTheme {
+        com.example.ui.GeeAiApp(viewModel = viewModel)
+      }
+    }
+
+    com.example.data.Screen.entries.forEach { screen ->
+      composeTestRule.runOnUiThread {
+        viewModel.setScreen(screen)
+      }
+      composeTestRule.waitForIdle()
+    }
   }
 }

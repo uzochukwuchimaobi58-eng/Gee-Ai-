@@ -1,0 +1,57 @@
+workflows:
+  android-release:
+    name: Android Release AAB Build (Sonance Key)
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      android_signing:
+        - sonance
+      vars:
+        PACKAGE_NAME: "com.aistudio.geeaivideo.hqkxpt"
+    scripts:
+      - name: Set up Java 21
+        script: |
+          jdk test 21 || jdk 21 || java -version
+
+      - name: Set up signing credentials from Codemagic
+        script: |
+          echo "Setting up signing environment variables for sonance..."
+          if [ -n "$CM_KEYSTORE_PATH" ]; then
+            echo "KEYSTORE_PATH=$CM_KEYSTORE_PATH" >> $CM_ENV
+            echo "STORE_PASSWORD=$CM_KEYSTORE_PASSWORD" >> $CM_ENV
+            echo "KEY_ALIAS=${CM_KEY_ALIAS:-sonance}" >> $CM_ENV
+            echo "KEY_PASSWORD=$CM_KEY_PASSWORD" >> $CM_ENV
+          fi
+
+      - name: Build Android App Bundle (AAB)
+        script: |
+          # Ensure gradlew exists or generate it
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper || true
+          fi
+          chmod +x ./gradlew 2>/dev/null || true
+
+          # Export signing keys for Gradle release build
+          export KEYSTORE_PATH="${CM_KEYSTORE_PATH:-$KEYSTORE_PATH}"
+          export STORE_PASSWORD="${CM_KEYSTORE_PASSWORD:-$STORE_PASSWORD}"
+          export KEY_ALIAS="${CM_KEY_ALIAS:-sonance}"
+          export KEY_PASSWORD="${CM_KEY_PASSWORD:-$KEY_PASSWORD}"
+
+          if [ -f "./gradlew" ]; then
+            ./gradlew :app:bundleRelease --stacktrace
+          else
+            gradle :app:bundleRelease --stacktrace
+          fi
+
+    artifacts:
+      - app/build/outputs/bundle/release/*.aab
+      - app/build/outputs/mapping/release/mapping.txt
+      - app/build/outputs/apk/release/*.apk
+
+    publishing:
+      email:
+        recipients:
+          - uzochukwuchimaobi58@gmail.com
+        notify:
+          success: true
+          failure: true

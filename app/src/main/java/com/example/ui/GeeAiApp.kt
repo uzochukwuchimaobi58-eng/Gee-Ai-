@@ -1,5 +1,9 @@
 package com.example.ui
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -29,6 +33,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -351,6 +357,7 @@ fun GeeAiApp(
                                 Screen.VIDEO_HISTORY -> VideoHistoryPane(viewModel)
                                 Screen.BILLING -> BillingPane(viewModel, userProfile)
                                 Screen.SETTINGS -> SettingsPane(viewModel, userProfile)
+                                Screen.BACKEND_SETTINGS -> BackendSettingsPane(viewModel)
                                 Screen.HELP -> HelpPane()
                                 Screen.ADMIN_PANEL -> AdminPanelPane(viewModel)
                                 Screen.SCENE_BUILDER -> SceneBuilderPane(viewModel, activeProject, activeScenes)
@@ -379,6 +386,9 @@ fun LoginScreen(viewModel: AppViewModel) {
     var isSignUp by remember { mutableStateOf(false) }
     var selectedRole by remember { mutableStateOf("User") } // Role check toggle
     val loginError by viewModel.loginError.collectAsState()
+    val isGoogleSigningIn by viewModel.isGoogleSigningIn.collectAsState()
+    val googleSignInError by viewModel.googleSignInError.collectAsState()
+    val context = LocalContext.current
 
     val backgroundBrush = if (isSystemInDarkTheme() || !isSystemInDarkTheme()) {
         Brush.verticalGradient(
@@ -404,36 +414,43 @@ fun LoginScreen(viewModel: AppViewModel) {
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 420.dp)
+                .widthIn(max = 480.dp)
                 .fillMaxWidth()
-                .padding(24.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
-                .padding(32.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Sleek Header
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(bottom = 8.dp)
+            // LOGIN & SIGN IN CONTAINER CARD
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                    .padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Filled.VideoCall,
-                    contentDescription = "Logo",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(36.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "GEE AI",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.SansSerif,
-                    letterSpacing = (-1).sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
+                // Sleek Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.VideoCall,
+                        contentDescription = "Logo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "GEE AI",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.SansSerif,
+                        letterSpacing = (-1).sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
             Text(
                 text = "Video Generation Suite",
@@ -545,27 +562,56 @@ fun LoginScreen(viewModel: AppViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Google Sign In integration mock
+            // Google Sign In with Credential Manager
             OutlinedButton(
-                onClick = { viewModel.login("google_user@gmail.com", "User") },
+                onClick = {
+                    val activity = context as? android.app.Activity
+                    if (activity != null) {
+                        viewModel.signInWithGoogle(activity)
+                    } else {
+                        viewModel.login("uzo.creator@gmail.com", "User")
+                    }
+                },
+                enabled = !isGoogleSigningIn,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("google_login_button")
                     .height(48.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star, // Visual representational icon
-                        contentDescription = "Google Icon",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                if (isGoogleSigningIn) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Continue with Google", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Signing in with Google...", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.AccountCircle,
+                            contentDescription = "Google Icon",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sign in with Google", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
+            }
+
+            if (googleSignInError != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = googleSignInError ?: "",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -581,6 +627,7 @@ fun LoginScreen(viewModel: AppViewModel) {
             )
         }
     }
+}
 }
 
 // ==========================================
@@ -787,11 +834,11 @@ fun SidebarContent(
                     SidebarMenuItem(Screen.IMAGE_TO_VIDEO, "AI Image to Video", Icons.Filled.Image),
                     SidebarMenuItem(Screen.UGC_VIDEO, "UGC Video", Icons.Filled.Campaign),
                     SidebarMenuItem(Screen.AVATAR_VIDEO, "Avatar Video", Icons.Filled.Person),
-                    SidebarMenuItem(Screen.AI_SCRIPT_WRITER, "AI Script Writer", Icons.Filled.Description),
                     SidebarMenuItem(Screen.AI_VOICE_STUDIO, "AI Voice Studio", Icons.Filled.RecordVoiceOver),
                     SidebarMenuItem(Screen.VIDEO_HISTORY, "Video History", Icons.Filled.History),
                     SidebarMenuItem(Screen.BILLING, "Billing & Active Plan", Icons.Filled.Payment),
                     SidebarMenuItem(Screen.SETTINGS, "Application Settings", Icons.Filled.Settings),
+                    SidebarMenuItem(Screen.BACKEND_SETTINGS, "Cloud & API Backend", Icons.Filled.Key),
                     SidebarMenuItem(Screen.HELP, "Help & Support Center", Icons.Filled.Help)
                 ).apply {
                     if (currentRole == "Admin") {
@@ -899,6 +946,7 @@ data class SidebarMenuItem(val screen: Screen, val title: String, val icon: Imag
 fun DashboardPane(viewModel: AppViewModel, userProfile: UserProfile?) {
     val projects by viewModel.allProjects.collectAsState()
     val recentProjects = remember(projects) { projects.take(4) }
+    val context = LocalContext.current
 
     LazyColumn(
         modifier = Modifier
@@ -1361,9 +1409,53 @@ fun DashboardPane(viewModel: AppViewModel, userProfile: UserProfile?) {
                                 project = project,
                                 onEdit = { viewModel.selectProjectForEditing(project) },
                                 onDelete = { viewModel.deleteProject(project) },
-                                onDuplicate = { viewModel.duplicateProject(project) }
+                                onDuplicate = { viewModel.duplicateProject(project) },
+                                onCopyLink = {
+                                    viewModel.copyVideoLink(context, project.id, project.name)
+                                },
+                                onShare = {
+                                    viewModel.shareVideoLink(context, project.id, project.name)
+                                }
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // Section: Recommended from Firebase Storage
+        item {
+            val storageItems by viewModel.recommendedStorageItems.collectAsState()
+            val context = LocalContext.current
+
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Recommended from Cloud Storage", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Curated templates, 4K b-roll, and UGC hooks hosted on your Firebase Storage bucket", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text("Firebase Storage", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(storageItems) { item ->
+                        StorageRecommendationCard(
+                            item = item,
+                            onCopyLink = { viewModel.copyVideoLink(context, item.id, item.title) },
+                            onShare = { viewModel.shareVideoLink(context, item.id, item.title) }
+                        )
                     }
                 }
             }
@@ -1442,6 +1534,16 @@ fun CreateVideoWizardPane(viewModel: AppViewModel) {
 
     val scriptText by viewModel.wizardScript.collectAsState()
     val isGeneratingScript by viewModel.isGeneratingScript.collectAsState()
+
+    val wizardDurationSeconds by viewModel.wizardDurationSeconds.collectAsState()
+    val wizardQualityTier by viewModel.wizardQualityTier.collectAsState()
+    val wizardTargetPlatforms by viewModel.wizardTargetPlatforms.collectAsState()
+    val showPlatformModal by viewModel.showPlatformConfirmationModal.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
+
+    val tokenBreakdown = remember(wizardDurationSeconds, wizardQualityTier) {
+        viewModel.calculateTokenDeduction(wizardDurationSeconds, wizardQualityTier)
+    }
 
     Column(
         modifier = Modifier
@@ -1542,26 +1644,59 @@ fun CreateVideoWizardPane(viewModel: AppViewModel) {
                                     singleLine = true,
                                     modifier = Modifier.weight(1f)
                                 )
-                                // Length dropdown selection
-                                Column(modifier = Modifier.weight(1f)) {
-                                    var lenExpanded by remember { mutableStateOf(false) }
-                                    Box(modifier = Modifier.fillMaxWidth()) {
-                                        OutlinedTextField(
-                                            value = lengthType,
-                                            onValueChange = {},
-                                            label = { Text("Video Length Range") },
-                                            readOnly = true,
-                                            trailingIcon = { IconButton(onClick = { lenExpanded = true }) { Icon(Icons.Filled.ArrowDropDown, null) } },
-                                            modifier = Modifier.fillMaxWidth()
+                                // Manual video duration selector (up to 10 seconds only)
+                                Card(
+                                    modifier = Modifier.weight(1f),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Manual Length (Max 10s)",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                                Text(
+                                                    text = "${wizardDurationSeconds}s",
+                                                    color = MaterialTheme.colorScheme.onPrimary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Slider(
+                                            value = wizardDurationSeconds.toFloat(),
+                                            onValueChange = { viewModel.wizardDurationSeconds.value = it.toInt() },
+                                            valueRange = 1f..10f,
+                                            steps = 8,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("video_length_slider")
                                         )
-                                        DropdownMenu(expanded = lenExpanded, onDismissRequest = { lenExpanded = false }) {
-                                            listOf("6 seconds to 1 minute", "1 minute to 5 minutes", "5 minutes to 10 minutes", "10 minutes to 30 minutes").forEach { len ->
-                                                DropdownMenuItem(
-                                                    text = { Text(len) },
-                                                    onClick = {
-                                                        viewModel.wizardLength.value = len
-                                                        lenExpanded = false
-                                                    }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            listOf(3, 5, 8, 10).forEach { s ->
+                                                FilterChip(
+                                                    selected = wizardDurationSeconds == s,
+                                                    onClick = { viewModel.wizardDurationSeconds.value = s },
+                                                    label = { Text("${s}s", fontSize = 11.sp) },
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                                        selectedLabelColor = MaterialTheme.colorScheme.primary
+                                                    )
                                                 )
                                             }
                                         }
@@ -1665,29 +1800,151 @@ fun CreateVideoWizardPane(viewModel: AppViewModel) {
                                     }
                                 }
 
-                                // Resolution Dropdown
+                                // Video Quality Dropdown (p to Ultra HD)
                                 Column(modifier = Modifier.weight(1f)) {
                                     var resExpanded by remember { mutableStateOf(false) }
                                     Box {
                                         OutlinedTextField(
-                                            value = resolution,
+                                            value = wizardQualityTier,
                                             onValueChange = {},
-                                            label = { Text("Target Resolution") },
+                                            label = { Text("Video Quality (SD to Ultra HD)") },
                                             readOnly = true,
                                             trailingIcon = { IconButton(onClick = { resExpanded = true }) { Icon(Icons.Filled.ArrowDropDown, null) } },
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier.fillMaxWidth().testTag("video_quality_selector")
                                         )
                                         DropdownMenu(expanded = resExpanded, onDismissRequest = { resExpanded = false }) {
-                                            listOf("720p (HD)", "1080p (Full HD)", "4K (Ultra HD - Future Ready)").forEach { r ->
+                                            listOf(
+                                                "480p (SD Standard)",
+                                                "720p (HD Standard)",
+                                                "1080p (Full HD)",
+                                                "1440p (2K Quad HD)",
+                                                "4K (Ultra HD)"
+                                            ).forEach { r ->
                                                 DropdownMenuItem(
-                                                    text = { Text(r) },
+                                                    text = {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(r, fontWeight = if (wizardQualityTier == r) FontWeight.Bold else FontWeight.Normal)
+                                                            val tokens = viewModel.calculateTokenDeduction(wizardDurationSeconds, r).totalTokens
+                                                            Text("~$tokens tokens", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                                                        }
+                                                    },
                                                     onClick = {
+                                                        viewModel.wizardQualityTier.value = r
                                                         viewModel.wizardResolution.value = r.split(" ").first()
                                                         resExpanded = false
                                                     }
                                                 )
                                             }
                                         }
+                                    }
+                                }
+                            }
+
+                            // Dynamic Claude & Firebase Token Deduction Estimator Card
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("token_deduction_card"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Token,
+                                                contentDescription = "Tokens",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Text(
+                                                text = "Token & Credit Deduction Estimator",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                            Text(
+                                                text = "${tokenBreakdown.totalTokens} Tokens",
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "• Claude AI Script & Prompt Tokens:",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "${tokenBreakdown.scriptClaudeTokens} Tokens",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "• Firebase Video Render Compute (${tokenBreakdown.durationSeconds}s @ ${tokenBreakdown.quality}):",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "${tokenBreakdown.renderComputeTokens} Tokens",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "• Account Credits Remaining After Generation:",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        val curBalance = userProfile?.creditsRemaining ?: 1000
+                                        Text(
+                                            text = "${maxOf(0, curBalance - tokenBreakdown.totalTokens)} Credits",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
                                     }
                                 }
                             }
@@ -1788,16 +2045,157 @@ fun CreateVideoWizardPane(viewModel: AppViewModel) {
                         }
                         wizardStep++
                     } else {
-                        // Build Scenes
-                        viewModel.buildScenesAndProject()
+                        // Prompt user to select target platforms and review token deduction
+                        viewModel.requestCreateVideoConfirmation()
                     }
                 },
                 modifier = Modifier.testTag("wizard_next_button")
             ) {
-                Text(if (wizardStep == 3) "Build Scenes & Go to Builder" else "Continue")
+                Text(if (wizardStep == 3) "Create Video (Choose Platforms)" else "Continue")
                 Spacer(modifier = Modifier.width(4.dp))
                 Icon(Icons.Filled.ArrowForward, contentDescription = null)
             }
+        }
+
+        // Before video generation: Ask user about 7 platforms and show token deduction
+        if (showPlatformModal) {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissPlatformConfirmation() },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Share,
+                        contentDescription = "Platforms",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                title = {
+                    Text(
+                        text = "Select Target Platforms (7 Platforms)",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Choose which social platforms you plan to post this video on so GEE AI can format aspect ratios, framerates, and metadata:",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                viewModel.allSevenPlatforms.forEach { platform ->
+                                    val isChecked = wizardTargetPlatforms.contains(platform)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { viewModel.toggleTargetPlatform(platform) }
+                                            .padding(vertical = 4.dp, horizontal = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Checkbox(
+                                                checked = isChecked,
+                                                onCheckedChange = { viewModel.toggleTargetPlatform(platform) },
+                                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                                            )
+                                            Text(
+                                                text = platform,
+                                                fontSize = 14.sp,
+                                                fontWeight = if (isChecked) FontWeight.SemiBold else FontWeight.Normal,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        if (isChecked) {
+                                            Badge(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
+                                                Text(
+                                                    "Selected",
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Summary of Tokens to Deduct
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Generation & Token Breakdown:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "• Length: ${wizardDurationSeconds}s (Manual selection, max 10s)",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "• Quality: $wizardQualityTier",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "• Deducting: ${tokenBreakdown.totalTokens} Tokens (${tokenBreakdown.scriptClaudeTokens} Claude + ${tokenBreakdown.renderComputeTokens} Render)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                val remaining = maxOf(0, (userProfile?.creditsRemaining ?: 1000) - tokenBreakdown.totalTokens)
+                                Text(
+                                    text = "• Credits remaining after generation: $remaining",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel.buildScenesAndProject() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.testTag("confirm_create_video_button")
+                    ) {
+                        Text("Confirm & Create Video")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissPlatformConfirmation() }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }
@@ -1812,6 +2210,23 @@ fun ImageToVideoPane(viewModel: AppViewModel) {
     val motionType by viewModel.imgToVideoMotion.collectAsState()
     val duration by viewModel.imgToVideoDuration.collectAsState()
     val isGenerating by viewModel.isGeneratingImageToVideo.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
+
+    // Android Photo Picker Launcher for uploading device photos
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.imgToVideoImageUri.value = uri.toString()
+        }
+    }
+
+    val sampleImages = listOf(
+        "https://images.unsplash.com/photo-1626544827763-d516dce335e2?q=80&w=600&auto=format&fit=crop" to "Cyberpunk City",
+        "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600&auto=format&fit=crop" to "Luxury Cosmetic",
+        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600&auto=format&fit=crop" to "Tropical Beach",
+        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=600&auto=format&fit=crop" to "Supercar Motion"
+    )
 
     Column(
         modifier = Modifier
@@ -1819,18 +2234,36 @@ fun ImageToVideoPane(viewModel: AppViewModel) {
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("AI Image-to-Video Engine", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text(
-            text = "Upload static imagery and apply professional AI visual camera motions (pan, zoom, orbit) to output high fidelity YouTube visuals.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("AI Image-to-Video Engine", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Upload static imagery and apply neural camera motions (zoom, orbit, pan) to generate high-retention video clips.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+                Text(
+                    text = "25 Credits / Clip",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
 
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
         ) {
             Row(
                 modifier = Modifier
@@ -1841,27 +2274,68 @@ fun ImageToVideoPane(viewModel: AppViewModel) {
                 // Settings Column
                 Column(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1.1f)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text("Settings", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Image Source & Upload", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+
+                    // Primary Upload Button
+                    Button(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("upload_image_to_video_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Filled.AddPhotoAlternate, contentDescription = "Upload Photo", modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Upload Image from Device Gallery", fontWeight = FontWeight.Bold)
+                    }
+
+                    // Preset Quick-Pick Images
+                    Text("Or Select Sample Inspiration:", style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        sampleImages.forEach { (url, label) ->
+                            FilterChip(
+                                selected = imgUri == url,
+                                onClick = { viewModel.imgToVideoImageUri.value = url },
+                                label = { Text(label, fontSize = 12.sp) },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(14.dp))
+                                }
+                            )
+                        }
+                    }
 
                     OutlinedTextField(
                         value = imgUri,
                         onValueChange = { viewModel.imgToVideoImageUri.value = it },
-                        label = { Text("Source Image URL / Path") },
-                        placeholder = { Text("Paste Unsplash or static web image path...") },
+                        label = { Text("Image URL or Uploaded Path") },
+                        placeholder = { Text("Selected image URI or custom link...") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Text("Preset Camera Motions", style = MaterialTheme.typography.labelMedium)
+                    Text("Camera Motion Style", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("Slow Zoom In", "Pan Right", "Tilt Up", "Orbit Rotation").forEach { motion ->
+                        listOf("Slow Zoom In", "Pan Right", "Tilt Up", "Orbit Rotation", "Hyper-lapse Push").forEach { motion ->
                             FilterChip(
                                 selected = motionType == motion,
                                 onClick = { viewModel.imgToVideoMotion.value = motion },
@@ -1873,18 +2347,63 @@ fun ImageToVideoPane(viewModel: AppViewModel) {
                     OutlinedTextField(
                         value = duration,
                         onValueChange = { viewModel.imgToVideoDuration.value = it },
-                        label = { Text("Output Clip Duration") },
+                        label = { Text("Output Clip Duration (Capped at 10s max)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // Monetization & Credit Deduction Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Filled.MonetizationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Text("Credit Deduction & Profit Margin", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                                Text("-25 Credits", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("• Retail Value ($0.10/credit):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("$2.50 USD", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("• Estimated Compute Cost:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("~$0.08 USD", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("• Your SaaS Profit Margin:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Text("96.8% Gross Margin", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            val currentCredits = userProfile?.creditsRemaining ?: 1000
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("• Balance after generation:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${maxOf(0, currentCredits - 25)} Credits", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
 
                     Button(
                         onClick = { viewModel.generateImageToVideo() },
                         enabled = !isGenerating,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .height(50.dp)
                             .testTag("generate_img_to_video"),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         if (isGenerating) {
                             CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
@@ -1893,7 +2412,7 @@ fun ImageToVideoPane(viewModel: AppViewModel) {
                         } else {
                             Icon(Icons.Filled.AutoAwesome, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Generate Image To Video (Deducts 20 credits)")
+                            Text("Generate Image To Video (Deduct 25 Credits)", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1901,9 +2420,9 @@ fun ImageToVideoPane(viewModel: AppViewModel) {
                 // Preview Column
                 Box(
                     modifier = Modifier
-                        .weight(1.2f)
+                        .weight(1f)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1920,22 +2439,44 @@ fun ImageToVideoPane(viewModel: AppViewModel) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.3f)),
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
+                                    )
+                                ),
                             contentAlignment = Alignment.BottomCenter
                         ) {
-                            Text(
-                                text = "Applying Motion: $motionType ($duration)",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(16.dp),
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Motion: $motionType ($duration)",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Ready to synthesize into fluid video",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                            Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Provide Source Image URL to View Live Generation Preview", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("No Source Image Selected", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Upload a photo from device or pick a preset to preview neural animation.",
+                                textAlign = TextAlign.Center,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -2106,8 +2647,120 @@ private fun UgcConfigSection(
     cta: String,
     isGenerating: Boolean
 ) {
+    val productImageUri by viewModel.ugcProductImageUri.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
+
+    val ugcPhotoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.ugcProductImageUri.value = uri.toString()
+        }
+    }
+
+    val productPresets = listOf(
+        "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=600&auto=format&fit=crop" to "Botanical Face Oil",
+        "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?q=80&w=600&auto=format&fit=crop" to "Wireless ANC Pods",
+        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?q=80&w=600&auto=format&fit=crop" to "Smart Titanium Ring",
+        "https://images.unsplash.com/photo-1556881286-fc6915169721?q=80&w=600&auto=format&fit=crop" to "Organic Energy Drink"
+    )
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Campaign Configuration", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("Campaign & Product Configuration", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+        // Upload Product Image section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Product Image / Packaging Asset", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    if (productImageUri.isNotBlank()) {
+                        Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                            Text("Image Attached", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                        }
+                    }
+                }
+
+                // Button for user to upload image inside UGC video
+                Button(
+                    onClick = {
+                        ugcPhotoPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                        .testTag("upload_ugc_product_image_button"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Filled.AddPhotoAlternate, contentDescription = "Upload", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Upload Product / Brand Image", fontWeight = FontWeight.Bold)
+                }
+
+                Text("Or Choose Sample Product Photo:", style = MaterialTheme.typography.labelSmall)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    productPresets.forEach { (url, label) ->
+                        FilterChip(
+                            selected = productImageUri == url,
+                            onClick = {
+                                viewModel.ugcProductImageUri.value = url
+                                if (productName.isBlank() || productName.contains("GlowSkin")) {
+                                    viewModel.ugcProductName.value = label
+                                }
+                            },
+                            label = { Text(label, fontSize = 11.sp) }
+                        )
+                    }
+                }
+
+                if (productImageUri.isNotBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(productImageUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Product preview",
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Selected Product Asset Active", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            Text("AI UGC creator will showcase this item in review frames.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = { viewModel.ugcProductImageUri.value = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+        }
 
         OutlinedTextField(
             value = productName,
@@ -2211,6 +2864,46 @@ private fun UgcConfigSection(
             modifier = Modifier.fillMaxWidth()
         )
 
+        // Monetization & Credit Deduction Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Filled.MonetizationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Text("UGC Credit Deduction & Margins", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    Text("-50 Credits", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Retail Package Value ($0.10/credit):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("$5.00 USD", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Estimated Neural Compute Cost:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("~$0.14 USD", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Your SaaS Profit Margin:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("97.2% Gross Profit", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                val currentCredits = userProfile?.creditsRemaining ?: 1000
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Account Balance after generation:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${maxOf(0, currentCredits - 50)} Credits", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
         Button(
             onClick = { viewModel.generateUgcVideo() },
             enabled = !isGenerating,
@@ -2226,11 +2919,11 @@ private fun UgcConfigSection(
             if (isGenerating) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Spacer(modifier = Modifier.width(10.dp))
-                Text("Synthesizing UGC Actor & Viral Hook (45 Credits)...")
+                Text("Synthesizing UGC Actor & Viral Hook (50 Credits)...")
             } else {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Generate UGC Video (45 Credits)", fontWeight = FontWeight.Bold)
+                Text("Generate UGC Video (Deduct 50 Credits)", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -2517,28 +3210,159 @@ private fun AvatarConfigSection(
     gestures: String,
     isGenerating: Boolean
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Digital Presenter Configuration", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    val availableAvatars by viewModel.availableAvatars.collectAsState()
+    val selectedAvatarId by viewModel.selectedAvatarId.collectAsState()
+    val customAvatarUri by viewModel.avatarCustomImageUri.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
 
-        Text("Select AI Avatar Persona", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+    val avatarPhotoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.setCustomAvatarImage(uri.toString())
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Digital Presenter & Face Model Selection", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+        // Custom Photo Upload Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+            shape = RoundedCornerShape(14.dp)
         ) {
-            listOf(
-                "Elena (Executive AI)",
-                "Marcus (Tech Lead)",
-                "Sophia (Educator)",
-                "David (Corporate Host)",
-                "Chloe (Creative Director)"
-            ).forEach { item ->
-                FilterChip(
-                    selected = avatarName == item,
-                    onClick = { viewModel.avatarName.value = item },
-                    label = { Text(item, fontSize = 12.sp) }
-                )
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Upload Photo for Custom Avatar Clone", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Badge(containerColor = MaterialTheme.colorScheme.secondary) {
+                        Text("Neural Cloning", color = MaterialTheme.colorScheme.onSecondary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        avatarPhotoPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                        .testTag("upload_avatar_photo_button"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Icon(Icons.Filled.AddPhotoAlternate, contentDescription = "Upload Face", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Upload Face Image to Use as Avatar", fontWeight = FontWeight.Bold)
+                }
+
+                if (customAvatarUri.isNotBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(customAvatarUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Custom face preview",
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(24.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Custom Face Cloned & Ready", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Neural lip-sync will animate your uploaded face photo.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Multiple Avatars Catalog (Scrollable Visual Cards)
+        Text("Choose from Multiple AI Avatars (${availableAvatars.size} Available):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(availableAvatars) { avatar ->
+                val isSelected = selectedAvatarId == avatar.id
+                Card(
+                    modifier = Modifier
+                        .width(140.dp)
+                        .clickable { viewModel.selectAvatar(avatar) }
+                        .testTag("avatar_card_${avatar.id}"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
+                    ),
+                    border = BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(avatar.imageUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = avatar.name,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(32.dp))
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    shape = RoundedCornerShape(32.dp)
+                                ),
+                            contentScale = ContentScale.Crop
+                        )
+                        Text(
+                            text = avatar.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
+                        Badge(containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant) {
+                            Text(
+                                text = avatar.category,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                        Text(
+                            text = avatar.role,
+                            fontSize = 10.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
 
@@ -2639,6 +3463,46 @@ private fun AvatarConfigSection(
             minLines = 4
         )
 
+        // Monetization & Credit Deduction Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Filled.MonetizationOn, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+                        Text("Avatar Credit Deduction & Economics", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    Text("-75 Credits", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary, fontSize = 13.sp)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Retail User Charge ($0.10/credit):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("$7.50 USD", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Estimated Neural Lip-Sync Compute Cost:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("~$0.18 USD", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Platform Owner Profit Margin:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                    Text("97.6% Gross Profit", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                }
+                val currentCredits = userProfile?.creditsRemaining ?: 1000
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("• Account Balance after generation:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${maxOf(0, currentCredits - 75)} Credits", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
         Button(
             onClick = { viewModel.generateAvatarVideo() },
             enabled = !isGenerating,
@@ -2658,7 +3522,7 @@ private fun AvatarConfigSection(
             } else {
                 Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Generate Avatar Video (75 Credits)", fontWeight = FontWeight.Bold)
+                Text("Generate Avatar Video (Deduct 75 Credits)", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -3116,11 +3980,14 @@ fun MyProjectsPane(viewModel: AppViewModel) {
                 modifier = Modifier.weight(1f)
             ) {
                 items(filteredList) { project ->
+                    val context = LocalContext.current
                     ProjectCard(
                         project = project,
                         onEdit = { viewModel.selectProjectForEditing(project) },
                         onDelete = { viewModel.deleteProject(project) },
-                        onDuplicate = { viewModel.duplicateProject(project) }
+                        onDuplicate = { viewModel.duplicateProject(project) },
+                        onCopyLink = { viewModel.copyVideoLink(context, project.id, project.name) },
+                        onShare = { viewModel.shareVideoLink(context, project.id, project.name) }
                     )
                 }
             }
@@ -3129,7 +3996,14 @@ fun MyProjectsPane(viewModel: AppViewModel) {
 }
 
 @Composable
-fun ProjectCard(project: Project, onEdit: () -> Unit, onDelete: () -> Unit, onDuplicate: () -> Unit) {
+fun ProjectCard(
+    project: Project,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onCopyLink: (() -> Unit)? = null,
+    onShare: (() -> Unit)? = null
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -3205,7 +4079,17 @@ fun ProjectCard(project: Project, onEdit: () -> Unit, onDelete: () -> Unit, onDu
                         Text("Edit", fontSize = 12.sp)
                     }
 
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (onCopyLink != null) {
+                            IconButton(onClick = onCopyLink, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Filled.Link, contentDescription = "Copy Video Link", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        if (onShare != null) {
+                            IconButton(onClick = onShare, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Filled.Share, contentDescription = "Share Video Link", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+                            }
+                        }
                         IconButton(onClick = onDuplicate, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Filled.ContentCopy, contentDescription = "Duplicate Project", modifier = Modifier.size(16.dp))
                         }
@@ -4037,6 +4921,9 @@ fun ExportPreviewPane(viewModel: AppViewModel, activeProject: Project?) {
 @Composable
 fun BillingPane(viewModel: AppViewModel, userProfile: UserProfile?) {
     val invoices by viewModel.allInvoices.collectAsState()
+    val billingStatus by viewModel.playBillingManager.billingStatusMessage.collectAsState()
+    val context = LocalContext.current
+    var isYearlyGlobal by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -4045,142 +4932,269 @@ fun BillingPane(viewModel: AppViewModel, userProfile: UserProfile?) {
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
-            Column {
-                Text("Billing & Premium Pricing Plans", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                Text("Choose a SaaS tier to top up your video credits instantly. We support a modular pay-per-credit system.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Billing & Premium Pricing Plans",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Upgrade your plan, top up AI generation credits, or choose yearly billing to save up to 21%.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Badge(
+                        containerColor = Color(0xFF1B5E20),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(
+                            text = "Play Billing 8.0.0 Active",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
         }
 
-        // Tier cards list
+        // AdMob Rewarded Ad Option: Earn free credits
         item {
-            var isYearly by remember { mutableStateOf(false) }
+            WatchAdForCreditsCard(
+                onEarnCredits = { amount ->
+                    viewModel.awardAdBonusCredits(amount)
+                }
+            )
+        }
 
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+        // Global Period Switcher
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Period Toggle Row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Text(
+                    text = "Monthly Payment",
+                    fontWeight = if (!isYearlyGlobal) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 14.sp,
+                    color = if (!isYearlyGlobal) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(14.dp))
+                Switch(
+                    checked = isYearlyGlobal,
+                    onCheckedChange = { isYearlyGlobal = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
+                Spacer(modifier = Modifier.width(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Monthly Plan",
-                        fontWeight = if (!isYearly) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = if (!isYearly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        text = "Yearly Payment",
+                        fontWeight = if (isYearlyGlobal) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 14.sp,
+                        color = if (isYearlyGlobal) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Switch(
-                        checked = isYearly,
-                        onCheckedChange = { isYearly = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF4CAF50).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
                         Text(
-                            text = "Yearly Plan",
-                            fontWeight = if (isYearly) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 15.sp,
-                            color = if (isYearly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            text = "Save up to 21%",
+                            color = Color(0xFF2E7D32),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0xFF4CAF50).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "Save 20%",
-                                color = Color(0xFF2E7D32),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                     }
                 }
+            }
+        }
 
-                Spacer(modifier = Modifier.height(8.dp))
+        // Free Plan Card
+        item {
+            PlanCard(
+                tierName = "Free",
+                monthlyPrice = "$0.00",
+                yearlyMonthlyEquivalent = "$0.00",
+                yearlyTotalPrice = "$0.00",
+                yearlySavingsLabel = "Free Forever",
+                creditsMonthly = "50 credits/mo",
+                creditsYearly = "50 credits/mo",
+                features = listOf(
+                    "720p HD Renderings",
+                    "Standard AI Voices",
+                    "3 Saved Project Drafts",
+                    "Community Discord Support"
+                ),
+                isSelected = userProfile?.subscriptionTier?.startsWith("Free") == true,
+                isCurrentYearly = false,
+                initialYearly = isYearlyGlobal,
+                onSelectMonthly = { viewModel.selectSubscriptionTier("Free", false) },
+                onSelectYearly = { viewModel.selectSubscriptionTier("Free", false) }
+            )
+        }
 
-                BillingCard(
-                    tierName = "Free",
-                    price = "$0.00",
-                    credits = "50 credits/mo",
-                    features = listOf("720p Renderings", "Standard AI Voice", "3 Saved Drafts"),
-                    isSelected = userProfile?.subscriptionTier == "Free",
-                    onSelect = { viewModel.selectSubscriptionTier("Free") },
-                    billingPeriod = "per month"
+        // Starter Plan Card
+        item {
+            val activity = context as? Activity
+            PlanCard(
+                tierName = "Starter",
+                monthlyPrice = "$19.00",
+                yearlyMonthlyEquivalent = "$15.00",
+                yearlyTotalPrice = "$180.00",
+                yearlySavingsLabel = "Save 21% (Save $48/year)",
+                creditsMonthly = "500 credits/mo",
+                creditsYearly = "7,000 credits/yr (+1,000 bonus credits!)",
+                features = listOf(
+                    "Up to 1080p Full HD Export",
+                    "Premium Neural AI Voices",
+                    "Unsplash Image-to-Video Synthesis",
+                    "10 Project Cloud Folders",
+                    "Remove Watermark & Custom Logo Overlay",
+                    "Ad-Free Rendering Experience",
+                    "Extended Video Duration (Up to 10 mins)"
+                ),
+                isSelected = userProfile?.subscriptionTier?.startsWith("Starter") == true,
+                isCurrentYearly = userProfile?.subscriptionTier?.contains("Yearly") == true,
+                initialYearly = isYearlyGlobal,
+                onSelectMonthly = {
+                    if (activity != null) {
+                        viewModel.launchPlayBillingPurchase(activity, "Starter", false)
+                    } else {
+                        viewModel.selectSubscriptionTier("Starter", false)
+                    }
+                },
+                onSelectYearly = {
+                    if (activity != null) {
+                        viewModel.launchPlayBillingPurchase(activity, "Starter", true)
+                    } else {
+                        viewModel.selectSubscriptionTier("Starter", true)
+                    }
+                }
+            )
+        }
+
+        // Pro Plan Card
+        item {
+            val activity = context as? Activity
+            PlanCard(
+                tierName = "Pro",
+                monthlyPrice = "$49.00",
+                yearlyMonthlyEquivalent = "$39.00",
+                yearlyTotalPrice = "$468.00",
+                yearlySavingsLabel = "Save 20% (Save $120/year)",
+                creditsMonthly = "1,500 credits/mo",
+                creditsYearly = "20,000 credits/yr (+2,000 bonus credits!)",
+                features = listOf(
+                    "Ultra 4K Broadcast-Quality Renderings",
+                    "Voice Studio Custom Neural Voice Clones",
+                    "All AI Presenter & Digital Avatars",
+                    "Unlimited Cloud Folder Storage",
+                    "Remove Watermark & Custom Logo Overlay",
+                    "Ad-Free Rendering Experience",
+                    "Extended Video Duration (Up to 20 mins)",
+                    "Priority Cloud Rendering Queue"
+                ),
+                isSelected = userProfile?.subscriptionTier?.startsWith("Pro") == true,
+                isCurrentYearly = userProfile?.subscriptionTier?.contains("Yearly") == true,
+                initialYearly = isYearlyGlobal,
+                onSelectMonthly = {
+                    if (activity != null) {
+                        viewModel.launchPlayBillingPurchase(activity, "Pro", false)
+                    } else {
+                        viewModel.selectSubscriptionTier("Pro", false)
+                    }
+                },
+                onSelectYearly = {
+                    if (activity != null) {
+                        viewModel.launchPlayBillingPurchase(activity, "Pro", true)
+                    } else {
+                        viewModel.selectSubscriptionTier("Pro", true)
+                    }
+                }
+            )
+        }
+
+        // Business Plan Card
+        item {
+            val activity = context as? Activity
+            PlanCard(
+                tierName = "Business",
+                monthlyPrice = "$149.00",
+                yearlyMonthlyEquivalent = "$119.00",
+                yearlyTotalPrice = "$1,428.00",
+                yearlySavingsLabel = "Save 20% (Save $360/year)",
+                creditsMonthly = "5,000 credits/mo",
+                creditsYearly = "70,000 credits/yr (+10,000 bonus credits!)",
+                features = listOf(
+                    "Dedicated High-Compute GPU Pipeline",
+                    "Full Commercial & Reseller Ownership Rights",
+                    "Custom REST API & Webhook Endpoints",
+                    "Multi-Seat Admin Dashboard Access",
+                    "Remove Watermark & Custom Logo Overlay",
+                    "Ad-Free Rendering Experience",
+                    "Maximum Video Duration (Up to 60 mins)",
+                    "Dedicated 24/7 VIP Account Manager"
+                ),
+                isSelected = userProfile?.subscriptionTier?.startsWith("Business") == true,
+                isCurrentYearly = userProfile?.subscriptionTier?.contains("Yearly") == true,
+                initialYearly = isYearlyGlobal,
+                onSelectMonthly = {
+                    if (activity != null) {
+                        viewModel.launchPlayBillingPurchase(activity, "Business", false)
+                    } else {
+                        viewModel.selectSubscriptionTier("Business", false)
+                    }
+                },
+                onSelectYearly = {
+                    if (activity != null) {
+                        viewModel.launchPlayBillingPurchase(activity, "Business", true)
+                    } else {
+                        viewModel.selectSubscriptionTier("Business", true)
+                    }
+                }
+            )
+        }
+
+        // AdMob Banner Ad at Bottom of Billing Page
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "SPONSORED ADVERTISEMENT (ADMOB)",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    letterSpacing = 1.sp
                 )
-
-                BillingCard(
-                    tierName = "Starter",
-                    price = if (isYearly) "$15.00" else "$19.00",
-                    credits = "500 credits/mo",
-                    features = listOf(
-                        "Up to 1080p Export", 
-                        "Premium AI Voices", 
-                        "Unsplash image-to-video tools", 
-                        "10 Project Folders",
-                        "No Watermark & Custom Brand Logo",
-                        "No Ads (Ad-Free Generation)",
-                        "Create Longer Videos (Up to 10 mins)"
-                    ),
-                    isSelected = userProfile?.subscriptionTier == "Starter",
-                    onSelect = { viewModel.selectSubscriptionTier("Starter") },
-                    billingPeriod = if (isYearly) "per month, billed annually ($180/yr)" else "per month"
-                )
-
-                BillingCard(
-                    tierName = "Pro",
-                    price = if (isYearly) "$39.00" else "$49.00",
-                    credits = "1500 credits/mo",
-                    features = listOf(
-                        "Ultra 4K Renderings", 
-                        "Voice Studio custom voice clones", 
-                        "All AI Presentation avatars", 
-                        "Unlimited Folder Storage",
-                        "No Watermark & Custom Brand Logo",
-                        "No Ads (Ad-Free Generation)",
-                        "Create Longer Videos (Up to 20 mins)"
-                    ),
-                    isSelected = userProfile?.subscriptionTier == "Pro",
-                    onSelect = { viewModel.selectSubscriptionTier("Pro") },
-                    billingPeriod = if (isYearly) "per month, billed annually ($468/yr)" else "per month"
-                )
-
-                BillingCard(
-                    tierName = "Business",
-                    price = if (isYearly) "$119.00" else "$149.00",
-                    credits = "5000 credits/mo",
-                    features = listOf(
-                        "Dedicated priority cloud render pipeline", 
-                        "Full commercial ownership rights", 
-                        "Custom REST API integration points", 
-                        "Admin dashboard access",
-                        "No Watermark & Custom Brand Logo",
-                        "No Ads (Ad-Free Generation)",
-                        "Create Longer Videos (Up to 60 mins)"
-                    ),
-                    isSelected = userProfile?.subscriptionTier == "Business",
-                    onSelect = { viewModel.selectSubscriptionTier("Business") },
-                    billingPeriod = if (isYearly) "per month, billed annually ($1428/yr)" else "per month"
-                )
+                AdMobBanner()
             }
         }
 
         // Invoice History Table
         item {
-            Text("Invoices History", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text("Invoices & Payment History", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
 
         if (invoices.isEmpty()) {
@@ -4212,6 +5226,7 @@ fun BillingPane(viewModel: AppViewModel, userProfile: UserProfile?) {
                         Column {
                             Text(invoice.id, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
                             Text("Plan / Package: ${invoice.planName}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Date: ${invoice.dateString}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -4229,23 +5244,33 @@ fun BillingPane(viewModel: AppViewModel, userProfile: UserProfile?) {
 }
 
 @Composable
-fun BillingCard(
+fun PlanCard(
     tierName: String,
-    price: String,
-    credits: String,
+    monthlyPrice: String,
+    yearlyMonthlyEquivalent: String,
+    yearlyTotalPrice: String,
+    yearlySavingsLabel: String,
+    creditsMonthly: String,
+    creditsYearly: String,
     features: List<String>,
     isSelected: Boolean,
-    onSelect: () -> Unit,
-    billingPeriod: String = "per month",
+    isCurrentYearly: Boolean,
+    initialYearly: Boolean,
+    onSelectMonthly: () -> Unit,
+    onSelectYearly: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var selectedCycleIsYearly by remember(initialYearly) { mutableStateOf(initialYearly) }
+    val isFree = tierName == "Free"
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .wrapContentHeight(),
+            .wrapContentHeight()
+            .testTag("plan_card_${tierName.lowercase()}"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface
         ),
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
@@ -4258,36 +5283,42 @@ fun BillingCard(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Header Row: Plan Name & Active Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = tierName,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                        fontSize = 22.sp,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = credits,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (isSelected) {
+                        Badge(containerColor = Color(0xFF2E7D32)) {
+                            Text(
+                                text = if (isCurrentYearly) "Active (Yearly)" else "Active Plan",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
+                // Price display reflecting current chosen cycle
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = price,
+                        text = if (isFree) "$0.00" else if (selectedCycleIsYearly) yearlyMonthlyEquivalent else monthlyPrice,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 32.sp,
+                        fontSize = 30.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = billingPeriod,
+                        text = if (isFree) "free forever" else if (selectedCycleIsYearly) "per month, billed annually ($yearlyTotalPrice/yr)" else "per month",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -4295,12 +5326,73 @@ fun BillingCard(
                 }
             }
 
+            // Per-Plan Yearly Payment Upgrade Toggle (for paid tiers)
+            if (!isFree) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Monthly Option Tab
+                        Button(
+                            onClick = { selectedCycleIsYearly = false },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (!selectedCycleIsYearly) MaterialTheme.colorScheme.surface else Color.Transparent,
+                                contentColor = if (!selectedCycleIsYearly) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = if (!selectedCycleIsYearly) ButtonDefaults.buttonElevation(defaultElevation = 2.dp) else ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            Text("Monthly: $monthlyPrice/mo", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        // Yearly Option Tab
+                        Button(
+                            onClick = { selectedCycleIsYearly = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedCycleIsYearly) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                contentColor = if (selectedCycleIsYearly) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = if (selectedCycleIsYearly) ButtonDefaults.buttonElevation(defaultElevation = 2.dp) else ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                            modifier = Modifier.weight(1.2f),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Yearly: $yearlyMonthlyEquivalent/mo", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(yearlySavingsLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Credit allocation text
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Filled.Payment, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                Text(
+                    text = if (selectedCycleIsYearly && !isFree) creditsYearly else creditsMonthly,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                modifier = Modifier.padding(vertical = 4.dp)
+                modifier = Modifier.padding(vertical = 2.dp)
             )
 
-            // Features list inside Column (safe for scroll layout)
+            // Features list
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -4327,29 +5419,81 @@ fun BillingCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            Button(
-                onClick = onSelect,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("subscribe_to_${tierName.lowercase()}"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isSelected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White
-                )
-            ) {
-                Text(
-                    text = if (isSelected) "Active Plan" else "Choose Plan",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+            // Action Buttons: Monthly selection and Dedicated Yearly Upgrade Button
+            if (isFree) {
+                Button(
+                    onClick = onSelectMonthly,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("subscribe_to_${tierName.lowercase()}"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = if (isSelected) "Active Free Plan" else "Select Free Plan",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Standard Monthly Option Button
+                    OutlinedButton(
+                        onClick = onSelectMonthly,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("subscribe_monthly_${tierName.lowercase()}"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "Pay Monthly ($monthlyPrice)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    // Highlighted Yearly Payment Upgrade Button
+                    Button(
+                        onClick = onSelectYearly,
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .height(48.dp)
+                            .testTag("upgrade_yearly_${tierName.lowercase()}"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected && isCurrentYearly) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (isSelected && isCurrentYearly) "Active Yearly Plan" else "Upgrade to Yearly",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "$yearlyTotalPrice/yr (Save 20%+)",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
+
 
 // ==========================================
 // PANE: Admin Panel View
@@ -4802,6 +5946,44 @@ fun MediaLibraryPane(viewModel: AppViewModel) {
                 }
             }
         }
+
+        // 3. Recommended Video Templates & Media Assets from Firebase Storage
+        item {
+            val storageItems by viewModel.recommendedStorageItems.collectAsState()
+            val context = LocalContext.current
+
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Recommended Cloud Storage Assets", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Downloadable stock scenes, UGC assets, and templates hosted in Firebase Storage", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+                        Text("Cloud Bucket", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(storageItems) { item ->
+                        StorageRecommendationCard(
+                            item = item,
+                            onCopyLink = { viewModel.copyVideoLink(context, item.id, item.title) },
+                            onShare = { viewModel.shareVideoLink(context, item.id, item.title) }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -4809,6 +5991,7 @@ fun MediaLibraryPane(viewModel: AppViewModel) {
 fun VideoHistoryPane(viewModel: AppViewModel) {
     val projects by viewModel.allProjects.collectAsState()
     val completedOnly = remember(projects) { projects.filter { it.status == "Completed" } }
+    val context = LocalContext.current
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("SaaS Render History", fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -4827,6 +6010,19 @@ fun VideoHistoryPane(viewModel: AppViewModel) {
                                 Text(proj.name, fontWeight = FontWeight.Bold)
                                 Text("Rendered at: ${proj.resolution} | ${proj.videoFormat}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            IconButton(
+                                onClick = { viewModel.copyVideoLink(context, proj.id, proj.name) },
+                                modifier = Modifier.size(36.dp).testTag("copy_link_${proj.id}")
+                            ) {
+                                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(
+                                onClick = { viewModel.shareVideoLink(context, proj.id, proj.name) },
+                                modifier = Modifier.size(36.dp).testTag("share_link_${proj.id}")
+                            ) {
+                                Icon(Icons.Filled.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
                             Button(onClick = { viewModel.selectProjectForEditing(proj) }) {
                                 Text("Edit/SEO Suite")
                             }
@@ -4864,7 +6060,523 @@ fun SettingsPane(viewModel: AppViewModel, userProfile: UserProfile?) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF4CAF50))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Stripe Credits Purchase Provider: Simulated Sandbox")
+                    Text("Firebase Crashlytics & Storage: Integrated")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BackendSettingsPane(viewModel: AppViewModel) {
+    val apiKey by viewModel.geminiApiKey.collectAsState()
+    val isKeyValid by viewModel.isGeminiKeyValid.collectAsState()
+    val testMessage by viewModel.geminiKeyTestMessage.collectAsState()
+    val isTesting by viewModel.isTestingGemini.collectAsState()
+
+    val storageBucket by viewModel.customStorageBucket.collectAsState()
+    val crashlyticsStatus by viewModel.crashlyticsTestStatus.collectAsState()
+    val storageItems by viewModel.recommendedStorageItems.collectAsState()
+
+    var inputKey by remember(apiKey) { mutableStateOf(apiKey) }
+    var showKey by remember { mutableStateOf(false) }
+    var inputBucket by remember(storageBucket) { mutableStateOf(storageBucket) }
+
+    val context = LocalContext.current
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Cloud Backend & API Secret Management",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Configure your Google AI Studio Gemini API keys, Firebase Cloud Storage bucket, and monitor Firebase Crashlytics telemetry.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // CARD 1: Gemini API Secret Key Configuration
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Filled.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Column {
+                                Text("Gemini AI API Key & Secret Storage", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("Powers AI Script Writing, Scene Generation, and Video Synthesis", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Badge(containerColor = if (apiKey.isNotBlank()) Color(0xFF1B5E20) else MaterialTheme.colorScheme.errorContainer) {
+                            Text(
+                                text = if (apiKey.isNotBlank()) "Key Configured" else "Key Missing",
+                                color = if (apiKey.isNotBlank()) Color.White else MaterialTheme.colorScheme.onErrorContainer,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    // How to get Gemini API Key instructions card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("How to get your Gemini API Key:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                            Text("1. Visit Google AI Studio at: aistudio.google.com/app/apikey", fontSize = 12.sp)
+                            Text("2. Sign in with your Google account and click \"Create API Key\".", fontSize = 12.sp)
+                            Text("3. Copy your key, paste it into the field below, and click \"Save Secret API Key\".", fontSize = 12.sp)
+                            Text("4. You can also configure MY_API_KEY in the AI Studio Secrets panel or .env file for automated build injection.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Input Field
+                    OutlinedTextField(
+                        value = inputKey,
+                        onValueChange = { inputKey = it },
+                        label = { Text("Gemini Secret API Key") },
+                        placeholder = { Text("AIzaSy...") },
+                        singleLine = true,
+                        visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showKey = !showKey }) {
+                                Icon(
+                                    imageVector = if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (showKey) "Hide key" else "Show key"
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("gemini_api_key_input")
+                    )
+
+                    // Action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.saveGeminiApiKey(inputKey) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("save_gemini_key_button")
+                        ) {
+                            Icon(Icons.Filled.Save, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Save Secret API Key")
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.testGeminiApiKey() },
+                            enabled = !isTesting,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("test_gemini_key_button")
+                        ) {
+                            if (isTesting) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Connecting...")
+                            } else {
+                                Icon(Icons.Filled.NetworkCheck, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Test Connection")
+                            }
+                        }
+                    }
+
+                    // Status Result
+                    if (testMessage.isNotBlank()) {
+                        val isSuccess = isKeyValid == true
+                        val isError = isKeyValid == false
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = when {
+                                isSuccess -> Color(0xFF1B5E20).copy(alpha = 0.15f)
+                                isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            border = BorderStroke(
+                                1.dp,
+                                when {
+                                    isSuccess -> Color(0xFF4CAF50)
+                                    isError -> MaterialTheme.colorScheme.error
+                                    else -> MaterialTheme.colorScheme.outline
+                                }
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = when {
+                                        isSuccess -> Icons.Filled.CheckCircle
+                                        isError -> Icons.Filled.Error
+                                        else -> Icons.Filled.Info
+                                    },
+                                    contentDescription = null,
+                                    tint = when {
+                                        isSuccess -> Color(0xFF2E7D32)
+                                        isError -> MaterialTheme.colorScheme.error
+                                        else -> MaterialTheme.colorScheme.primary
+                                    }
+                                )
+                                Text(
+                                    text = testMessage,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 2: Firebase Storage Bucket & Link Sharing Configuration
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Column {
+                                Text("Firebase Storage Bucket & Video Link Sharing", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("Storage destination for user videos, UGC clips, and media downloads", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+                            Text("Active Bucket", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = inputBucket,
+                        onValueChange = { inputBucket = it },
+                        label = { Text("Storage Bucket Domain") },
+                        placeholder = { Text("studio-4528506733-318e2.firebasestorage.app") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("storage_bucket_input")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.saveStorageBucket(inputBucket) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("save_storage_bucket_button")
+                        ) {
+                            Icon(Icons.Filled.Save, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Save Bucket")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.copyVideoLink(context, "sample_ugc_video_01", "Sample GEE AI Video")
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("copy_sample_link_button")
+                        ) {
+                            Icon(Icons.Filled.ContentCopy, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Copy Sample Video Link")
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Live Shareable URL Format:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                text = "https://firebasestorage.googleapis.com/v0/b/$storageBucket/o/user_videos%2F{videoId}.mp4?alt=media",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 3: Firebase Crashlytics Integration
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Filled.BugReport, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
+                            Column {
+                                Text("Firebase Crashlytics Health & Stability", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("Realtime error reporting, exception tracing, and session monitoring", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Badge(containerColor = Color(0xFF1B5E20)) {
+                            Text("Crashlytics Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                            Text("Crashlytics SDK initialized & bound to application lifecycle", fontSize = 13.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                            Text("Automatic user tagging with authenticated Firebase UID", fontSize = 13.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                            Text("Custom key tracking: has_gemini_api_key, active_plan, user_role", fontSize = 13.sp)
+                        }
+                    }
+
+                    Button(
+                        onClick = { viewModel.triggerCrashlyticsTest() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("test_crashlytics_button")
+                    ) {
+                        Icon(Icons.Filled.Send, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Send Diagnostic Report to Firebase Crashlytics")
+                    }
+
+                    if (crashlyticsStatus.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF1B5E20).copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, Color(0xFF4CAF50)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF2E7D32))
+                                Text(crashlyticsStatus, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 4: Recommended Storage Items Showcase
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.FolderSpecial, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Curated Assets in Firebase Storage", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("Copy shareable links or distribute templates to collaborators", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(storageItems) { item ->
+                        StorageRecommendationCard(
+                            item = item,
+                            onCopyLink = { viewModel.copyVideoLink(context, item.id, item.title) },
+                            onShare = { viewModel.shareVideoLink(context, item.id, item.title) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StorageRecommendationCard(
+    item: StorageRecommendedItem,
+    onCopyLink: () -> Unit,
+    onShare: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(280.dp)
+            .testTag("storage_card_${item.id}"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(130.dp)
+            ) {
+                AsyncImage(
+                    model = item.thumbnailUrl,
+                    contentDescription = item.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                                startY = 50f
+                            )
+                        )
+                )
+
+                // Category Badge
+                Badge(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = item.category,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+
+                // Duration & Size pill
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Schedule, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                    Text("${item.durationText} • ${item.fileSizeMb}MB", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = item.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = item.description,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Filled.Download, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                        Text("${item.downloadsCount} used", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(
+                            onClick = onCopyLink,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("copy_link_${item.id}")
+                        ) {
+                            Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        }
+                        IconButton(
+                            onClick = onShare,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("share_link_${item.id}")
+                        ) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                        }
+                    }
                 }
             }
         }
@@ -4884,7 +6596,11 @@ fun HelpPane() {
 
                 Text("Q: How can I change the background soundtrack?", fontWeight = FontWeight.Bold)
                 Text("A: In Step 2 of the Creation Wizard or directly in the Timeline Tracks editor, click on the Background Soundtrack dropdown to view available instrumental scores.", fontSize = 13.sp)
+
+                Text("Q: Where are videos stored and how do I share them?", fontWeight = FontWeight.Bold)
+                Text("A: Rendered videos are automatically uploaded to your Firebase Cloud Storage bucket. Each video has a 'Copy Link' button and 'Share' action to easily send direct links to clients and social platforms.", fontSize = 13.sp)
             }
         }
     }
 }
+

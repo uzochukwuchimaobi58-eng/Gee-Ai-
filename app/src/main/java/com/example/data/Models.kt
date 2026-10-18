@@ -76,3 +76,56 @@ data class SeoMetadata(
     val chapters: String,
     val hashtags: String
 )
+
+data class TokenBreakdown(
+    val scriptClaudeTokens: Int,
+    val renderComputeTokens: Int,
+    val totalTokens: Int,
+    val durationSeconds: Int,
+    val quality: String
+)
+
+data class GenerationRecord(
+    val id: String = "",
+    val projectId: String = "",
+    val videoTitle: String = "",
+    val durationSeconds: Int = 10,
+    val quality: String = "1080p",
+    val tokensDeducted: Int = 0,
+    val platforms: List<String> = emptyList(),
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+data class AvatarOption(
+    val id: String,
+    val name: String,
+    val role: String,
+    val category: String,
+    val imageUrl: String,
+    val voiceRecommendation: String,
+    val description: String,
+    val isCustom: Boolean = false
+)
+
+data class MonetizationTier(
+    val featureName: String,
+    val creditCost: Int,
+    val retailUsdValue: Double,
+    val estimatedComputeCostUsd: Double,
+    val profitMarginPercent: Double,
+    val description: String
+)
+
+data class StorageRecommendedItem(
+    val id: String,
+    val title: String,
+    val category: String,
+    val storagePath: String,
+    val directUrl: String,
+    val thumbnailUrl: String,
+    val durationText: String,
+    val fileSizeMb: Double,
+    val downloadsCount: Int,
+    val description: String
+)
+

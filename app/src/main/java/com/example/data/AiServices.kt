@@ -125,7 +125,7 @@ interface IVideoRenderer {
 }
 
 interface IPaymentService {
-    suspend fun processSubscription(email: String, tier: String): Invoice
+    suspend fun processSubscription(email: String, tier: String, isYearly: Boolean = false): Invoice
 }
 
 // ==========================================
@@ -311,27 +311,47 @@ class VideoRenderer : IVideoRenderer {
 }
 
 class PaymentService : IPaymentService {
-    override suspend fun processSubscription(email: String, tier: String): Invoice {
-        val amount = when (tier) {
-            "Starter" -> "$19.00"
-            "Pro" -> "$49.00"
-            "Business" -> "$149.00"
-            else -> "$0.00"
+    override suspend fun processSubscription(email: String, tier: String, isYearly: Boolean): Invoice {
+        val amount = if (isYearly) {
+            when (tier) {
+                "Starter" -> "$180.00"
+                "Pro" -> "$468.00"
+                "Business" -> "$1,428.00"
+                else -> "$0.00"
+            }
+        } else {
+            when (tier) {
+                "Starter" -> "$19.00"
+                "Pro" -> "$49.00"
+                "Business" -> "$149.00"
+                else -> "$0.00"
+            }
         }
-        val credits = when (tier) {
-            "Starter" -> 500
-            "Pro" -> 1500
-            "Business" -> 5000
-            else -> 50
+        val credits = if (isYearly) {
+            when (tier) {
+                "Starter" -> 7000 // 500/mo + 1,000 annual bonus credits
+                "Pro" -> 20000 // 1,500/mo + 2,000 annual bonus credits
+                "Business" -> 70000 // 5,000/mo + 10,000 annual bonus credits
+                else -> 50
+            }
+        } else {
+            when (tier) {
+                "Starter" -> 500
+                "Pro" -> 1500
+                "Business" -> 5000
+                else -> 50
+            }
         }
         val invoiceId = "INV-${System.currentTimeMillis() % 1000000}"
+        val planLabel = if (isYearly && tier != "Free") "$tier (Yearly)" else "$tier (Monthly)"
+        val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
         return Invoice(
             id = invoiceId,
             email = email,
-            dateString = "2026-07-03",
+            dateString = dateStr,
             amount = amount,
             creditsAdded = credits,
-            planName = tier,
+            planName = planLabel,
             status = "Paid"
         )
     }
