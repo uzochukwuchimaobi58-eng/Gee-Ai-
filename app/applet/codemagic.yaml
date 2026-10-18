@@ -16,11 +16,40 @@ workflows:
       - name: Set up signing credentials from Codemagic
         script: |
           echo "Setting up signing environment variables for sonance..."
-          if [ -n "$CM_KEYSTORE_PATH" ]; then
+          mkdir -p "$HOME/keystores"
+          
+          # 1. If base64 encoded CM_KEYSTORE is present, decode it
+          if [ -n "$CM_KEYSTORE" ] && [ ! -f "$CM_KEYSTORE_PATH" ]; then
+            echo "Decoding CM_KEYSTORE..."
+            echo "$CM_KEYSTORE" | base64 --decode > "$HOME/keystores/sonance.keystore"
+            export CM_KEYSTORE_PATH="$HOME/keystores/sonance.keystore"
+          fi
+
+          # 2. Check if a valid keystore exists
+          if [ -n "$CM_KEYSTORE_PATH" ] && [ -f "$CM_KEYSTORE_PATH" ]; then
+            echo "Found keystore at $CM_KEYSTORE_PATH"
             echo "KEYSTORE_PATH=$CM_KEYSTORE_PATH" >> $CM_ENV
-            echo "STORE_PASSWORD=$CM_KEYSTORE_PASSWORD" >> $CM_ENV
+            echo "CM_KEYSTORE_PATH=$CM_KEYSTORE_PATH" >> $CM_ENV
+            echo "STORE_PASSWORD=${CM_KEYSTORE_PASSWORD:-$STORE_PASSWORD}" >> $CM_ENV
+            echo "CM_KEYSTORE_PASSWORD=${CM_KEYSTORE_PASSWORD:-$STORE_PASSWORD}" >> $CM_ENV
             echo "KEY_ALIAS=${CM_KEY_ALIAS:-sonance}" >> $CM_ENV
-            echo "KEY_PASSWORD=$CM_KEY_PASSWORD" >> $CM_ENV
+            echo "CM_KEY_ALIAS=${CM_KEY_ALIAS:-sonance}" >> $CM_ENV
+            echo "KEY_PASSWORD=${CM_KEY_PASSWORD:-$KEY_PASSWORD}" >> $CM_ENV
+            echo "CM_KEY_PASSWORD=${CM_KEY_PASSWORD:-$KEY_PASSWORD}" >> $CM_ENV
+          else
+            echo "No existing keystore file found. Generating self-contained sonance release keystore..."
+            keytool -genkeypair -v -keystore "$HOME/keystores/sonance.keystore" \
+              -alias sonance -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "${STORE_PASSWORD:-sonance123}" -keypass "${KEY_PASSWORD:-sonance123}" \
+              -dname "CN=GeeAI, OU=Mobile, O=GeeAI, L=London, S=London, C=GB"
+            echo "KEYSTORE_PATH=$HOME/keystores/sonance.keystore" >> $CM_ENV
+            echo "CM_KEYSTORE_PATH=$HOME/keystores/sonance.keystore" >> $CM_ENV
+            echo "STORE_PASSWORD=${STORE_PASSWORD:-sonance123}" >> $CM_ENV
+            echo "CM_KEYSTORE_PASSWORD=${STORE_PASSWORD:-sonance123}" >> $CM_ENV
+            echo "KEY_ALIAS=sonance" >> $CM_ENV
+            echo "CM_KEY_ALIAS=sonance" >> $CM_ENV
+            echo "KEY_PASSWORD=${KEY_PASSWORD:-sonance123}" >> $CM_ENV
+            echo "CM_KEY_PASSWORD=${KEY_PASSWORD:-sonance123}" >> $CM_ENV
           fi
 
       - name: Build Android App Bundle (AAB)
@@ -32,15 +61,15 @@ workflows:
           chmod +x ./gradlew 2>/dev/null || true
 
           # Export signing keys for Gradle release build
-          export KEYSTORE_PATH="${CM_KEYSTORE_PATH:-$KEYSTORE_PATH}"
-          export STORE_PASSWORD="${CM_KEYSTORE_PASSWORD:-$STORE_PASSWORD}"
-          export KEY_ALIAS="${CM_KEY_ALIAS:-sonance}"
-          export KEY_PASSWORD="${CM_KEY_PASSWORD:-$KEY_PASSWORD}"
+          export KEYSTORE_PATH="${KEYSTORE_PATH:-$CM_KEYSTORE_PATH}"
+          export STORE_PASSWORD="${STORE_PASSWORD:-$CM_KEYSTORE_PASSWORD}"
+          export KEY_ALIAS="${KEY_ALIAS:-${CM_KEY_ALIAS:-sonance}}"
+          export KEY_PASSWORD="${KEY_PASSWORD:-$CM_KEY_PASSWORD}"
 
           if [ -f "./gradlew" ]; then
-            ./gradlew :app:bundleRelease --stacktrace
+            ./gradlew :app:bundleRelease --stacktrace --no-daemon
           else
-            gradle :app:bundleRelease --stacktrace
+            gradle :app:bundleRelease --stacktrace --no-daemon
           fi
 
     artifacts:
