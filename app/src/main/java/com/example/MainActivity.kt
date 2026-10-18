@@ -14,11 +14,7 @@ import androidx.compose.runtime.setValue
 import com.example.data.AppViewModel
 import com.example.ui.GeeAiApp
 import com.example.ui.theme.MyApplicationTheme
-import com.google.android.gms.ads.MobileAds
 import com.google.firebase.FirebaseApp
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -45,14 +41,6 @@ class MainActivity : ComponentActivity() {
       Log.w("MainActivity", "FirebaseApp init skipped: ${t.message}")
     }
 
-    // Initialize MobileAds asynchronously in background to prevent main-thread Mesa/rendernode blocks
-    CoroutineScope(Dispatchers.IO).launch {
-      try {
-        MobileAds.initialize(this@MainActivity) {}
-      } catch (t: Throwable) {
-        Log.w("MainActivity", "MobileAds init skipped: ${t.message}")
-      }
-    }
     enableEdgeToEdge()
     setContent {
       var darkTheme by remember { mutableStateOf(true) } // SaaS apps look best in dark theme by default!

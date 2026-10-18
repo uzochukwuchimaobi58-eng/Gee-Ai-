@@ -34,6 +34,37 @@ object AdMobConfig {
     const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
 }
 
+object AdMobInitializer {
+    @Volatile
+    private var isInitialized = false
+
+    fun initIfNeeded(context: Context) {
+        if (isInitialized) return
+        synchronized(this) {
+            if (isInitialized) return
+            try {
+                // Ensure chromium code cache directories exist before WebView subsystem opens
+                val cacheRoot = context.cacheDir
+                listOf("js", "wasm").forEach { sub ->
+                    val dir = java.io.File(cacheRoot, "WebView/Default/HTTP Cache/Code Cache/$sub")
+                    if (!dir.exists()) dir.mkdirs()
+                    val indexDir = java.io.File(dir, "index-dir")
+                    if (!indexDir.exists()) indexDir.mkdirs()
+                }
+            } catch (t: Throwable) {
+                Log.w("AdMobInitializer", "Cache dir init: ${t.message}")
+            }
+
+            try {
+                MobileAds.initialize(context.applicationContext) {}
+            } catch (t: Throwable) {
+                Log.w("AdMobInitializer", "MobileAds init: ${t.message}")
+            }
+            isInitialized = true
+        }
+    }
+}
+
 @Composable
 fun AdMobBanner(
     modifier: Modifier = Modifier,
@@ -53,6 +84,7 @@ fun AdMobBanner(
             modifier = Modifier.fillMaxWidth().height(50.dp),
             factory = { context ->
                 try {
+                    AdMobInitializer.initIfNeeded(context)
                     AdView(context).apply {
                         setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
                         setAdSize(AdSize.BANNER)
@@ -78,6 +110,7 @@ class RewardedAdManager(private val context: Context) {
         private set
 
     init {
+        AdMobInitializer.initIfNeeded(context)
         loadRewardedAd()
     }
 
